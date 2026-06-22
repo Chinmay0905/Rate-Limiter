@@ -4,7 +4,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
-import com.chinmay.ratelimiter.model.UserRequest;
+import java.util.Queue;
+import java.util.LinkedList;
+
 
 @Service
 public class RateLimiterService {
@@ -12,40 +14,37 @@ public class RateLimiterService {
     private static final int LIMIT = 5;
     private static final long WINDOW_SIZE = 60_000;
 
-    private final Map<String, UserRequest> requestMap = new ConcurrentHashMap<>();
+    private final Map<String, Queue<Long>> requestMap = new ConcurrentHashMap<>();
 
     public boolean allowRequest(String userId) {
 
         long currentTime = System.currentTimeMillis();
 
-        if(!requestMap.containsKey(userId)) {
-            requestMap.put(userId, new UserRequest(1, currentTime));
-            System.out.println("New User: " + userId);
-            return true;
+        requestMap.putIfAbsent(
+                userId,
+                new LinkedList<>()
+        );
+
+        Queue<Long> queue = requestMap.get(userId);
+
+        while (!queue.isEmpty()
+                && queue.peek() <= currentTime - WINDOW_SIZE) {
+
+            queue.poll();
         }
 
-        UserRequest userRequest = requestMap.get(userId);
+        if (queue.size() >= LIMIT) {
 
-        if (currentTime - userRequest.getWindowStartTime() >= WINDOW_SIZE) {
+            System.out.println(
+                    "Rate Limit Exceeded for " + userId
+            );
 
-            userRequest.setCount(1);
-            userRequest.setWindowStartTime(currentTime);
-
-            System.out.println("Window Reset for: " + userId);
-            return true;
-        }
-
-        if (userRequest.getCount() >= LIMIT) {
-
-            System.out.println("Rate Limit Exceeded for: " + userId);
             return false;
         }
 
-        userRequest.setCount(userRequest.getCount() + 1);
-
         System.out.println(
                 "User: " + userId +
-                        " Count: " + userRequest.getCount());
+                        " Requests in last minute: " + queue.size());
 
         return true;
     }
