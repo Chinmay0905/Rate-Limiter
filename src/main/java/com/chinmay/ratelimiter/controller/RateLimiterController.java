@@ -1,17 +1,17 @@
-package com.chinmay.ratelimiter;
+package com.chinmay.ratelimiter.controller;
 
-import com.chinmay.ratelimiter.service.RateLimiterService;
+import com.chinmay.ratelimiter.service.TokenBucketRateLimiterService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.ResponseEntity;
 
 @RestController
-public class TestController {
+public class RateLimiterController {
 
-    private final RateLimiterService rateLimiterService;
+    private final TokenBucketRateLimiterService rateLimiterService;
 
-    public TestController(RateLimiterService rateLimiterService) {
+    public RateLimiterController(TokenBucketRateLimiterService rateLimiterService) {
         this.rateLimiterService = rateLimiterService;
     }
 
