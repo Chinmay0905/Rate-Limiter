@@ -5,6 +5,9 @@ public class TokenBucket {
     private int tokens;
     private long lastRefillTime;
 
+    public TokenBucket() {
+    }
+
     public TokenBucket(int tokens, long lastRefillTime) {
         this.tokens = tokens;
         this.lastRefillTime = lastRefillTime;

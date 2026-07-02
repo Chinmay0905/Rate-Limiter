@@ -1,10 +1,10 @@
 package com.chinmay.ratelimiter.service;
 
-import com.chinmay.ratelimiter.model.TokenBucket;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
+import java.util.List;
 
 @Service
 public class TokenBucketRateLimiterService {
@@ -14,69 +14,41 @@ public class TokenBucketRateLimiterService {
     // 1 token every 12 seconds
     private static final long REFILL_INTERVAL = 12_000;
 
-    private final Map<String, TokenBucket> bucketMap =
-            new ConcurrentHashMap<>();
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisScript<Long> tokenBucketScript;
+
+    public TokenBucketRateLimiterService(RedisTemplate<String, Object> redisTemplate, RedisScript<Long> tokenBucketScript) {
+
+        this.redisTemplate = redisTemplate;
+        this.tokenBucketScript = tokenBucketScript;
+    }
+
 
     public boolean allowRequest(String userId) {
 
         long currentTime = System.currentTimeMillis();
 
-        bucketMap.putIfAbsent(
-                userId,
-                new TokenBucket(CAPACITY, currentTime)
-        );
+        String key = "bucket:" + userId;
 
-        TokenBucket bucket = bucketMap.get(userId);
+        Long allowed =
+                redisTemplate.execute(
+                        tokenBucketScript,
+                        List.of(key),
+                        String.valueOf(currentTime),
+                        String.valueOf(CAPACITY),
+                        String.valueOf(REFILL_INTERVAL)
+                );
 
-        refillTokens(bucket, currentTime);
+        if (allowed == 1) {
 
-        if (bucket.getTokens() <= 0) {
+            System.out.println("Algorithm: Token Bucket");
+            System.out.println("Request Allowed: " + userId);
 
-            System.out.println(
-                    "Rate Limit Exceeded for: " + userId
-            );
-
-            return false;
+            return true;
         }
 
-        bucket.setTokens(bucket.getTokens() - 1);
+        System.out.println("Rate Limit Exceeded: " + userId);
 
-        System.out.println(
-                "Algorithm: Token Bucket ");
-
-        System.out.println(
-                "User: " + userId +
-                        " Remaining Tokens: " +
-                        bucket.getTokens()
-        );
-
-        return true;
-    }
-
-    private void refillTokens(
-            TokenBucket bucket,
-            long currentTime) {
-
-        long elapsedTime =
-                currentTime - bucket.getLastRefillTime();
-
-        long newTokens =
-                elapsedTime / REFILL_INTERVAL;
-
-        if (newTokens <= 0) {
-            return;
-        }
-
-        bucket.setTokens(
-                Math.min(
-                        CAPACITY,
-                        bucket.getTokens() + (int) newTokens
-                )
-        );
-
-        bucket.setLastRefillTime(
-                bucket.getLastRefillTime()
-                        + (newTokens * REFILL_INTERVAL)
-        );
+        return false;
     }
 }
